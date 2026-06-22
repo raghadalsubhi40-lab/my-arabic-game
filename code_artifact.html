@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لعبة الحروف العربية التفاعلية 🎮</title>
+    <!-- Tailwind CSS for modern responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for child-friendly Arabic Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;800;900&family=Tajawal:wght@700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Cairo', 'Tajawal', sans-serif;
+            background: radial-gradient(circle, #ffedd5 0%, #fef3c7 100%);
+            touch-action: none; /* Prevents default panning/zooming during drag and drop */
+        }
+        .drag-item {
+            touch-action: none;
+            user-select: none;
+        }
+        .correct-pulse {
+            animation: pulse-green 1s infinite;
+        }
+        @keyframes pulse-green {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0px rgba(34, 197, 94, 0.7); }
+            50% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(34, 197, 94, 0); }
+        }
+        .wrong-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px); }
+            40%, 80% { transform: translateX(8px); }
+        }
+        /* Floating background clouds/bubbles */
+        .bubble {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+            animation: floatUp 15s infinite linear;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(100vh) scale(0.3); opacity: 0; }
+            10% { opacity: 0.8; }
+            90% { opacity: 0.8; }
+            100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between overflow-x-hidden relative select-none">
+
+    <!-- Background decorative bubbles -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div class="bubble w-20 h-20 left-10" style="animation-delay: 0s; animation-duration: 12s;"></div>
+        <div class="bubble w-32 h-32 left-1/3" style="animation-delay: 3s; animation-duration: 18s;"></div>
+        <div class="bubble w-16 h-16 right-20" style="animation-delay: 1s; animation-duration: 14s;"></div>
+    </div>
+
+    <!-- Top Header -->
+    <header class="w-full p-4 flex justify-between items-center z-10 max-w-4xl mx-auto flex-wrap gap-2">
+        <div class="flex items-center gap-2 bg-white/80 backdrop-blur px-4 py-2 rounded-full shadow-md">
+            <span class="text-2xl">🏆</span>
+            <span id="scoreText" class="text-lg font-bold text-orange-600">النقاط: 0 / 10</span>
+        </div>
+        
+        <div class="flex items-center gap-2">
+            <button onclick="toggleKeyModal()" class="text-xs bg-white/80 hover:bg-amber-100 backdrop-blur px-3 py-1.5 rounded-full shadow-md border border-amber-200 text-amber-800 flex items-center gap-1 transition-all">
+                🔑 مفتاح الذكاء الاصطناعي
+            </button>
+            <div class="flex items-center gap-2 bg-white/80 backdrop-blur px-4 py-2 rounded-full shadow-md">
+                <span class="text-lg font-bold text-amber-700" id="progressIndicator">الحرف 1 من 10</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Optional API Key Setup Modal -->
+    <div id="keyModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border-4 border-orange-300">
+            <h3 class="text-xl font-bold text-orange-600 mb-2">🔑 مفتاح Gemini API</h3>
+            <p class="text-xs text-gray-500 mb-4">أدخل مفتاح Gemini هنا لتشغيل قصص أرنوب المسموعة ورسم الصور الذكية تلقائياً!</p>
+            <input id="userApiKeyInput" type="password" placeholder="AI Key..." class="w-full p-3 border-2 border-amber-200 rounded-xl mb-4 text-center text-sm outline-none focus:border-amber-500">
+            <div class="flex gap-2">
+                <button onclick="saveApiKey()" class="flex-1 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-xl text-sm shadow-md active:scale-95 transition-all">حفظ ومتابعة</button>
+                <button onclick="toggleKeyModal()" class="flex-1 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl text-sm transition-all">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Game Section -->
+    <main class="flex-grow flex items-center justify-center p-4 z-10 w-full max-w-4xl mx-auto">
+        
+        <!-- Welcome Screen -->
+        <section id="homeScreen" class="w-full max-w-md bg-white/90 backdrop-blur-md rounded-3xl p-8 shadow-2xl border-4 border-amber-300 text-center flex flex-col items-center gap-6">
+            <div class="w-24 h-24 bg-amber-100 rounded-full flex items-center justify-center text-5xl shadow-inner animate-bounce relative">
+                🎈
+            </div>
+            <h1 class="text-3xl md:text-4xl font-extrabold text-amber-600 leading-normal">لعبة الحروف العربية التفاعلية</h1>
+            <p class="text-gray-600 text-base md:text-lg">اسحب الصور للحرف المناسب، ودع المساعد الذكي <b class="text-orange-500">"أرنوب"</b> يروي لك قصصاً ويصنع لك صوراً سحرية!</p>
+            <button onclick="startGame()" class="w-full max-w-xs py-4 px-8 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-2xl rounded-2xl shadow-lg transition-transform active:scale-95 border-b-4 border-amber-700">
+                ابدأ اللعب الآن 🚀
+            </button>
+        </section>
+
+        <!-- Gameplay Screen -->
+        <section id="gameScreen" class="hidden w-full flex flex-col items-center gap-6">
+            <div class="w-full grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                
+                <!-- Mascot Box -->
+                <div class="bg-white/80 backdrop-blur rounded-3xl p-4 border-2 border-orange-200 shadow-md text-center flex flex-col items-center justify-between min-h-[200px]">
+                    <div class="relative">
+                        <span class="text-6xl" id="mascotEmoji">🐰</span>
+                    </div>
+                    <div class="mt-2">
+                        <span class="bg-orange-100 text-orange-700 text-xs px-2.5 py-0.5 rounded-full font-bold">أرنوب الذكي</span>
+                        <p id="mascotSpeechBubble" class="text-sm font-medium text-gray-700 mt-2 px-2 max-h-[100px] overflow-y-auto leading-relaxed">أهلاً بك يا بطل! اسحب الصورة المناسبة نحو صندوق الحرف السحري!</p>
+                    </div>
+                    <button onclick="askMascotNewWord()" id="askMascotBtn" class="mt-3 w-full py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white font-bold text-xs rounded-xl shadow-md hover:from-blue-600 active:scale-95 transition-all">
+                        🪄 اسأل أرنوب كلمة أخرى بحرف (<span id="askMascotLetter">أ</span>)
+                    </button>
+                </div>
+
+                <!-- Game Center and Target Drop Zone -->
+                <div class="md:col-span-2 flex flex-col items-center justify-center gap-6 bg-white/40 p-4 rounded-3xl backdrop-blur">
+                    <div class="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-12 w-full">
+                        <!-- Big Letter Card -->
+                        <div class="bg-gradient-to-br from-amber-400 to-orange-400 text-white w-32 h-32 rounded-3xl shadow-xl flex flex-col items-center justify-center border-4 border-white relative">
+                            <span class="text-xs absolute top-2 right-4 bg-white/30 px-2 py-0.5 rounded-full text-white font-bold">الحرف</span>
+                            <span id="activeLetter" class="text-6xl font-black">أ</span>
+                        </div>
+
+                        <!-- Drop Target Container -->
+                        <div id="dropZone" class="w-40 h-40 bg-dashed border-4 border-dashed border-amber-400 bg-amber-50/50 rounded-3xl flex flex-col items-center justify-center transition-all p-4 relative group">
+                            <div id="dropZonePrompt" class="text-center flex flex-col items-center justify-center gap-2 pointer-events-none">
+                                <div class="text-5xl text-amber-400">📥</div>
+                                <p class="text-xs font-bold text-amber-700">اسحب الإجابة هنا</p>
+                            </div>
+                            <div id="droppedContent" class="hidden flex flex-col items-center justify-center gap-1">
+                                <span id="droppedEmoji" class="text-5xl">🦁</span>
+                                <span id="droppedLabel" class="text-lg font-extrabold text-green-700"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Instruction Text -->
+                    <p class="text-base md:text-lg font-bold text-amber-900 text-center">أين الكلمة التي تبدأ بحرف (<span id="instructionLetter" class="text-orange-600 font-extrabold text-xl">أ</span>)؟</p>
+
+                    <!-- Draggable Options Container -->
+                    <div class="w-full flex justify-center gap-3 flex-wrap mt-2" id="optionsContainer">
+                        <!-- Will be populated dynamically -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Correct/Success Modal -->
+        <div id="successModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-3xl p-6 max-w-md w-full text-center shadow-2xl border-4 border-green-400 transform scale-95 transition-transform duration-300 flex flex-col items-center gap-4">
+                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-3xl animate-bounce">
+                    ⭐
+                </div>
+                <h2 class="text-2xl font-black text-green-600">أحسنت ممتاز!</h2>
+                
+                <div class="flex items-center gap-2 bg-green-50 px-4 py-1.5 rounded-xl text-green-700 font-bold text-lg border border-green-200">
+                    <span id="successFeedbackWord" class="text-xl">🦁 أسد</span>
+                </div>
+
+                <!-- AI Story Box -->
+                <div class="w-full bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-4 border border-orange-200 flex flex-col items-center gap-3 relative">
+                    <button onclick="speakCurrentStory()" id="speakStoryBtn" class="absolute top-2 left-2 w-8 h-8 bg-orange-500 hover:bg-orange-600 text-white rounded-full flex items-center justify-center shadow transition-all active:scale-90">
+                        🔊
+                    </button>
+
+                    <div class="w-32 h-32 bg-white rounded-2xl shadow-inner border border-amber-100 flex items-center justify-center overflow-hidden relative">
+                        <img id="aiGeneratedImg" src="" alt="صورة سحرية" class="w-full h-full object-cover hidden">
+                        <div id="aiImagePlaceholder" class="absolute inset-0 flex flex-col items-center justify-center gap-1 text-center p-2 text-xs font-semibold text-amber-500">
+                            <span id="fallbackEmoji" class="text-5xl">🦁</span>
+                        </div>
+                    </div>
+                    
+                    <div class="text-right w-full">
+                        <span class="text-xs font-extrabold text-orange-600 block mb-1">🤖 حكاية سحرية من أرنوب:</span>
+                        <p id="aiStoryText" class="text-xs md:text-sm text-amber-950 font-bold leading-relaxed"></p>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 w-full mt-2">
+                    <button onclick="nextQuestion()" class="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold text-lg rounded-xl shadow-md active:scale-95">
+                        الحرف التالي ➡️
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wrong/Failure Modal -->
+        <div id="wrongModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border-4 border-red-400 flex flex-col items-center gap-5">
+                <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center text-4xl">
+                    😢
+                </div>
+                <h2 class="text-3xl font-black text-red-500">حاول مرة أخرى</h2>
+                <p class="text-gray-600 font-medium">الكلمة التي اخترتها لا تبدأ بهذا الحرف.</p>
+                <button onclick="closeWrongModal()" class="w-full py-3 bg-gradient-to-r from-red-500 to-rose-500 text-white font-bold text-xl rounded-xl shadow-md active:scale-95">
+                    إعادة المحاولة 🔄
+                </button>
+            </div>
+        </div>
+
+        <!-- Finish Screen -->
+        <section id="finishScreen" class="hidden w-full max-w-md bg-white/90 backdrop-blur-md rounded-3xl p-8 shadow-2xl border-4 border-amber-400 text-center flex flex-col items-center gap-6">
+            <div class="text-7xl animate-pulse">🎉🥳👑</div>
+            <h1 class="text-3xl font-extrabold text-amber-600">تهانينا البطل!</h1>
+            <p class="text-gray-700 text-lg">لقد أكملت جميع الحروف العربية بنجاح رائع!</p>
+            <div class="bg-amber-100/80 px-6 py-3 rounded-2xl border border-amber-300 text-amber-800 text-2xl font-black">
+                النتيجة النهائية: 10 / 10 ⭐
+            </div>
+            <button onclick="resetGame()" class="w-full max-w-xs py-4 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-black text-xl rounded-2xl shadow-lg transition-transform active:scale-95">
+                العب من جديد 🔄
+            </button>
+        </section>
+
+    </main>
+
+    <!-- Canvas Confetti -->
+    <canvas id="confettiCanvas" class="absolute inset-0 pointer-events-none z-40 hidden"></canvas>
+
+    <!-- Footer -->
+    <footer class="w-full text-center p-3 text-sm text-amber-800 bg-white/40 backdrop-blur mt-auto z-10">
+        مدعوم بالذكاء الاصطناعي الفائق من Google Gemini ✨
+    </footer>
+
+    <script>
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let localApiKey = localStorage.getItem("gemini_api_key") || "";
+
+        // Audio initialization
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioCtx();
+        }
+
+        function playSound(type) {
+            initAudio();
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'correct') {
+                const now = audioCtx.currentTime;
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(261.63, now); // C4
+                osc.frequency.setValueAtTime(329.63, now + 0.15); // E4
+                osc.frequency.setValueAtTime(392.00, now + 0.3); // G4
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            } else {
+                const now = audioCtx.currentTime;
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(80, now + 0.4);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            }
+        }
+
+        // Clean & educational mappings
+        const questions = [
+            { letter: 'أ', correct: '🦁 أسد', options: ['🦁 أسد', '🐄 بقرة', '🦊 ثعلب'], emoji: '🦁' },
+            { letter: 'ب', correct: '🦆 بطة', options: ['🍎 تفاحة', '🦆 بطة', '🐊 تمساح'], emoji: '🦆' },
+            { letter: 'ت', correct: '🍎 تفاحة', options: ['🍎 تفاحة', '🦊 ثعلب', '🐪 جمل'], emoji: '🍎' },
+            { letter: 'ث', correct: '🦊 ثعلب', options: ['🐴 حصان', '🦊 ثعلب', '🐑 خروف'], emoji: '🦊' },
+            { letter: 'ج', correct: '🐪 جمل', options: ['🐓 دجاجة', '🌽 ذرة', '🐪 جمل'], emoji: '🐪' },
+            { letter: 'ح', correct: '🐴 حصان', options: ['🐴 حصان', '🐊 تمساح', '🍉 رمان'], emoji: '🐴' },
+            { letter: 'خ', correct: '🐑 خروف', options: ['🐄 بقرة', '🍎 تفاحة', '🐑 خروف'], emoji: '🐑' },
+            { letter: 'د', correct: '🐓 دجاجة', options: ['🐓 دجاجة', '🌽 ذرة', '🦊 ثعلب'], emoji: '🐓' },
+            { letter: 'ذ', correct: '🌽 ذرة', options: ['🐪 جمل', '🌽 ذرة', '🐴 حصان'], emoji: '🌽' },
+            { letter: 'ر', correct: '🍉 رمان', options: ['🍉 رمان', '🐑 خروف', '🐓 دجاجة'], emoji: '🍉' }
+        ];
+
+        let currentQuestionIdx = 0;
+        let score = 0;
+        let draggedElement = null;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let activeGeneratedStory = "";
+        let currentActiveAudio = null;
+
+        function toggleKeyModal() {
+            document.getElementById('keyModal').classList.toggle('hidden');
+            document.getElementById('userApiKeyInput').value = localApiKey;
+        }
+
+        function saveApiKey() {
+            localApiKey = document.getElementById('userApiKeyInput').value.trim();
+            localStorage.setItem("gemini_api_key", localApiKey);
+            toggleKeyModal();
+        }
+
+        function startGame() {
+            initAudio();
+            document.getElementById('homeScreen').classList.add('hidden');
+            document.getElementById('gameScreen').classList.remove('hidden');
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            const q = questions[currentQuestionIdx];
+            document.getElementById('activeLetter').textContent = q.letter;
+            document.getElementById('instructionLetter').textContent = q.letter;
+            document.getElementById('askMascotLetter').textContent = q.letter;
+            document.getElementById('progressIndicator').textContent = `الحرف ${currentQuestionIdx + 1} من 10`;
+            document.getElementById('scoreText').textContent = `النقاط: ${score} / 10`;
+
+            document.getElementById('mascotSpeechBubble').textContent = `أهلاً بك يا بطل! اسحب الكلمة التي تبدأ بحرف (${q.letter}) نحو الصندوق السحري!`;
+
+            const dropZone = document.getElementById('dropZone');
+            document.getElementById('dropZonePrompt').classList.remove('hidden');
+            document.getElementById('droppedContent').classList.add('hidden');
+            dropZone.className = "w-40 h-40 bg-dashed border-4 border-dashed border-amber-400 bg-amber-50/50 rounded-3xl flex flex-col items-center justify-center p-4 relative";
+
+            const container = document.getElementById('optionsContainer');
+            container.innerHTML = '';
+
+            const shuffled = [...q.options].sort(() => Math.random() - 0.5);
+            shuffled.forEach(option => {
+                const [emoji, text] = option.split(' ');
+                const card = document.createElement('div');
+                card.className = "drag-item bg-white hover:bg-amber-50 border-2 border-amber-200 active:scale-95 rounded-2xl p-4 flex flex-col items-center justify-center gap-1 cursor-grab shadow-md w-24 h-28 transition-transform z-10 select-none";
+                card.setAttribute('data-value', option);
+                card.setAttribute('data-emoji', emoji);
+                card.setAttribute('data-text', text);
+                
+                card.innerHTML = `
+                    <span class="text-4xl pointer-events-none">${emoji}</span>
+                    <span class="text-sm font-black text-amber-900 pointer-events-none">${text}</span>
+                `;
+
+                card.addEventListener('pointerdown', onPointerDown);
+                container.appendChild(card);
+            });
+        }
+
+        // Pointer Drag & Drop handlers
+        function onPointerDown(e) {
+            e.preventDefault();
+            initAudio();
+            draggedElement = e.currentTarget;
+            draggedElement.setPointerCapture(e.pointerId);
+            draggedElement.classList.add('shadow-2xl', 'scale-105', 'z-30');
+            draggedElement.style.cursor = 'grabbing';
+
+            touchStartX = e.clientX;
+            touchStartY = e.clientY;
+
+            draggedElement.addEventListener('pointermove', onPointerMove);
+            draggedElement.addEventListener('pointerup', onPointerUp);
+        }
+
+        function onPointerMove(e) {
+            if (!draggedElement) return;
+            const dx = e.clientX - touchStartX;
+            const dy = e.clientY - touchStartY;
+            draggedElement.style.transform = `translate(${dx}px, ${dy}px)`;
+        }
+
+        function onPointerUp(e) {
+            if (!draggedElement) return;
+            draggedElement.releasePointerCapture(e.pointerId);
+            
+            const rect = draggedElement.getBoundingClientRect();
+            const dropZone = document.getElementById('dropZone');
+            const targetRect = dropZone.getBoundingClientRect();
+
+            const overlap = !(rect.right < targetRect.left || 
+                             rect.left > targetRect.right || 
+                             rect.bottom < targetRect.top || 
+                             rect.top > targetRect.bottom);
+
+            if (overlap) {
+                checkAnswer(draggedElement.getAttribute('data-value'), draggedElement);
+            } else {
+                resetDraggedElement();
+            }
+
+            draggedElement.removeEventListener('pointermove', onPointerMove);
+            draggedElement.removeEventListener('pointerup', onPointerUp);
+        }
+
+        function resetDraggedElement() {
+            if (draggedElement) {
+                draggedElement.style.transition = 'transform 0.3s ease';
+                draggedElement.style.transform = 'translate(0px, 0px)';
+                draggedElement.style.cursor = 'grab';
+                draggedElement.classList.remove('shadow-2xl', 'scale-105', 'z-30');
+                draggedElement = null;
+            }
+        }
+
+        function checkAnswer(val, elem) {
+            const currentQ = questions[currentQuestionIdx];
+            if (val === currentQ.correct) {
+                score++;
+                playSound('correct');
+                
+                document.getElementById('dropZonePrompt').classList.add('hidden');
+                document.getElementById('droppedContent').classList.remove('hidden');
+                document.getElementById('droppedEmoji').textContent = elem.getAttribute('data-emoji');
+                document.getElementById('droppedLabel').textContent = elem.getAttribute('data-text');
+                document.getElementById('dropZone').className = "w-40 h-40 bg-green-50 border-4 border-green-500 rounded-3xl flex flex-col items-center justify-center p-4 relative correct-pulse";
+                
+                elem.classList.add('hidden');
+
+                triggerAIFeedback(currentQ);
+
+                document.getElementById('successFeedbackWord').textContent = currentQ.correct;
+                setTimeout(() => {
+                    document.getElementById('successModal').classList.remove('hidden');
+                    startConfetti();
+                }, 400);
+            } else {
+                playSound('wrong');
+                elem.classList.add('wrong-shake');
+                setTimeout(() => {
+                    elem.classList.remove('wrong-shake');
+                    resetDraggedElement();
+                }, 500);
+
+                setTimeout(() => {
+                    document.getElementById('wrongModal').classList.remove('hidden');
+                }, 300);
+            }
+        }
+
+        // Kid-friendly offline fallback helper
+        function getFallbackStory(word, letter) {
+            const cleanWord = word.replace(/[^\u0621-\u064A\s]/g, '').trim();
+            const stories = {
+                'أسد': 'الأسد شجاع وقوي يحب اللعب معك يا بطل!',
+                'بطة': 'البطة الجميلة تسبح في الماء وتقول كواك كواك!',
+                'تفاحة': 'التفاحة اللذيذة تعطينا طاقة وحيوية وصحة ممتازة!',
+                'ثعلب': 'الثعلب الصغير يحب اللعب والجري في الغابة الخضراء!',
+                'جمل': 'الجمل صبور وقوي يسير في رمال الصحراء الذهبية!',
+                'حصان': 'الحصان سريع جداً يجري بذكاء ويمرح بسعادة!',
+                'خروف': 'الخروف لطيف وصوفه ناعم وجميل كالغيمة البيضاء!',
+                'دجاجة': 'الدجاجة اللطيفة ترعى صغارها وتقول باق باق باق!',
+                'ذرة': 'الذرة الصفراء حلوة المذاق ومفيدة جداً ومقرمشة!',
+                'رمان': 'الرمان الأحمر المليء بالحبوب اللذيذة يحب الأطفال!'
+            };
+            return stories[cleanWord] || `أحسنت يا بطل! كلمة ${cleanWord} تبدأ بحرف الـ ${letter} المميز!`;
+        }
+
+        // AI pipeline triggers
+        async function triggerAIFeedback(q) {
+            const storyText = document.getElementById('aiStoryText');
+            const fallbackEmoji = document.getElementById('fallbackEmoji');
+            fallbackEmoji.textContent = q.emoji;
+
+            const cleanWord = q.correct.replace(/[^\u0621-\u064A\s]/g, '').trim();
+            const staticStory = getFallbackStory(q.correct, q.letter);
+
+            activeGeneratedStory = staticStory;
+            storyText.textContent = staticStory;
+
+            if (localApiKey) {
+                // If developer provided key, fetch creative content dynamically from Gemini
+                fetchDynamicAIFeedback(cleanWord, q.letter);
+            } else {
+                // Use built-in web speech synthesis fallback
+                speakFallback(staticStory);
+            }
+        }
+
+        async function fetchDynamicAIFeedback(word, letter) {
+            const storyText = document.getElementById('aiStoryText');
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${localApiKey}`;
+            const systemPrompt = "أنت 'أرنوب'، شخصية كرتونية مرحة تروي للأطفال جملة تشجيعية واحدة ممتعة جداً لا تزيد عن 8 كلمات بلغة عربية فصحى طبيعية وسهلة تماماً.";
+            const prompt = `اكتب تشجيعاً مضحكاً وسهلاً للطفل عن (${word}) يبدأ بـ 'أرنوب يقول...'.`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        systemInstruction: { parts: [{ text: systemPrompt }] }
+                    })
+                });
+                if (response.ok) {
+                    const json = await response.json();
+                    const result = json?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                    if (result) {
+                        activeGeneratedStory = result;
+                        storyText.textContent = result;
+                        speakFallback(result);
+                    }
+                }
+            } catch(e) {
+                console.debug("Failed dynamic Gemini text generation, using fallback.");
+            }
+        }
+
+        function speakFallback(text) {
+            if (currentActiveAudio) {
+                currentActiveAudio.pause();
+                currentActiveAudio = null;
+            }
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'ar-SA';
+            utterance.rate = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function speakCurrentStory() {
+            if (activeGeneratedStory) {
+                speakFallback(activeGeneratedStory);
+            }
+        }
+
+        // Mascot secondary word dynamic suggestion
+        async function askMascotNewWord() {
+            const currentQ = questions[currentQuestionIdx];
+            const letter = currentQ.letter;
+            const bubble = document.getElementById('mascotSpeechBubble');
+            
+            bubble.textContent = "أرنوب يفكر الآن في كلمة سحرية أخرى...";
+            
+            if (localApiKey) {
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${localApiKey}`;
+                try {
+                    const res = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: `أعطني كلمة للأطفال تبدأ بحرف (${letter}) وجملة كرتونية قصيرة مضحكة عنها. لا تستخدم الكلمة الأساسية (${currentQ.correct}).` }] }]
+                        })
+                    });
+                    if (res.ok) {
+                        const json = await res.json();
+                        const val = json?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                        if (val) {
+                            bubble.textContent = val;
+                            speakFallback(val);
+                            return;
+                        }
+                    }
+                } catch(e) {}
+            }
+
+            // Local fallback if no API key is specified
+            const fallbackWordOptions = {
+                'أ': 'أرنب! أرنب يقفز ويحب أكل الجزر الحلو!',
+                'ب': 'بيت! بيت كبير دافئ نلعب فيه مع ماما وبابا!',
+                'ت': 'تمر! التمر حلو ومغذي ويعطي الأبطال طاقة ممتازة!',
+                'ث': 'ثوب! ثوبي الجديد نظيف وأنيق وأحب ارتداءه دائماً!',
+                'ج': 'جسر! جسر طويل فوق النهر نمر فوقه بسلام!',
+                'ح': 'حلوى! الحلوى لذيذة ولكن نأكل منها القليل لنحمي أسناننا!',
+                'خ': 'خيار! خياري الأخضر المقرمش مفيد ويجعلني قوياً!',
+                'د': 'دب! الدب اللطيف يحب العسل واللعب في الغابة الجميلة!',
+                'ذ': 'ذئب! ذئب يغني للقمر بسعادة ومرح في غابة جميلة!',
+                'ر': 'ريشة! ريشة الطير ناعمة وخفيفة تطير في الهواء الواسع!'
+            };
+            const fText = fallbackWordOptions[letter];
+            bubble.textContent = fText;
+            speakFallback(fText);
+        }
+
+        function closeWrongModal() {
+            document.getElementById('wrongModal').classList.add('hidden');
+            resetDraggedElement();
+        }
+
+        function nextQuestion() {
+            stopConfetti();
+            document.getElementById('successModal').classList.add('hidden');
+            currentQuestionIdx++;
+            if (currentQuestionIdx < questions.length) {
+                loadQuestion();
+            } else {
+                showFinishScreen();
+            }
+        }
+
+        function showFinishScreen() {
+            document.getElementById('gameScreen').classList.add('hidden');
+            document.getElementById('finishScreen').classList.remove('hidden');
+            startConfetti();
+            speakFallback("تهانينا البطل الرائع! لقد أكملت جميع الحروف العربية بنجاح وحصلت على لقب تاج المعرفة! ممتاز جداً!");
+        }
+
+        function resetGame() {
+            stopConfetti();
+            currentQuestionIdx = 0;
+            score = 0;
+            document.getElementById('finishScreen').classList.add('hidden');
+            document.getElementById('homeScreen').classList.remove('hidden');
+        }
+
+        // Lightweight Confetti Particles animation
+        const canvas = document.getElementById("confettiCanvas");
+        const ctx = canvas.getContext("2d");
+        let confettiActive = false;
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener("resize", resizeCanvas);
+
+        class ConfettiParticle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height - canvas.height;
+                this.r = Math.random() * 6 + 4;
+                this.d = Math.random() * canvas.height;
+                this.color = ["#FFC107", "#FF5722", "#4CAF50", "#00BCD4", "#E91E63", "#9C27B0"][Math.floor(Math.random() * 6)];
+                this.tilt = Math.random() * 10 - 5;
+                this.tiltAngleIncremental = Math.random() * 0.07 + 0.02;
+                this.tiltAngle = 0;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.lineWidth = this.r / 2;
+                ctx.strokeStyle = this.color;
+                ctx.moveTo(this.x + this.tilt + this.r / 4, this.y);
+                ctx.lineTo(this.x + this.tilt, this.y + this.tilt + this.r / 4);
+                ctx.stroke();
+            }
+            update() {
+                this.tiltAngle += this.tiltAngleIncremental;
+                this.y += (Math.cos(this.d) + 3 + this.r / 2) / 2;
+                this.x += Math.sin(this.tiltAngle);
+                this.tilt = Math.sin(this.tiltAngle - this.r / 2) * 5;
+                if (this.y > canvas.height) {
+                    this.y = -20;
+                    this.x = Math.random() * canvas.width;
+                }
+            }
+        }
+
+        function drawConfetti() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => { p.draw(); p.update(); });
+            if (confettiActive) requestAnimationFrame(drawConfetti);
+        }
+
+        function startConfetti() {
+            resizeCanvas();
+            canvas.classList.remove('hidden');
+            confettiActive = true;
+            particles = [];
+            for (let i = 0; i < 100; i++) particles.push(new ConfettiParticle());
+            drawConfetti();
+        }
+
+        function stopConfetti() {
+            confettiActive = false;
+            canvas.classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
